@@ -20,6 +20,12 @@ parser.add_argument(
     help="Skip requesting elevation",
     action="store_true"
 )
+parser.add_argument(
+    "-r", "--realonly",
+    help="Only execute on physical machines, exit if in VM",
+    action="store_true"
+)
+
 
 args = parser.parse_args()
 
@@ -28,7 +34,6 @@ DIR_ROOT = "./"
 # =============================================================================
 
 import os
-import shutil
 import re
 import ctypes
 import sys
@@ -220,26 +225,13 @@ def ExecuteOrderedTasks():
     for dirEntry in pool:
         ProcessTaskDir(dirEntry.path)
 
-def tryRemove(path):
-    try:
-        os.remove(path)
-    except:
-        pass
-
-def tryRmtree(path):
-    try:
-        shutil.rmtree(path)
-    except:
-        pass
-
-def pause():
-    input("Press the <ENTER> key to continue...")
-
 def main():
-    if IsVirtualMachine():
+    if args.realonly and IsVirtualMachine():
         logging.info("Virtual machine detected, skipping deployment")
-        pause()
-        tryRemove(args.log)
+        try:
+            os.remove(args.log)
+        except:
+            pass
         return
 
     if not args.usermode and ForceAdmin():
@@ -264,8 +256,6 @@ def main():
         logging.getLogger().addHandler(streamHandler)
 
     ExecuteOrderedTasks()
-    
-    pause()
 
 if __name__=="__main__":
     main()
