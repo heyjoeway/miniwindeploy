@@ -6,7 +6,7 @@ Stupid simple task runner, intended for deploying/debloating/customizing Windows
 ## Usage
 
 ```
-$ python -m minideploywin
+$ python -m miniwindeploy
 usage: __main__.py [-h] [-e] [-l LOG] [-m MODEL] [-u]
 
 optional arguments:
