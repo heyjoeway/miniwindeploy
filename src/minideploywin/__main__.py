@@ -62,11 +62,22 @@ def ForceAdmin() -> bool:
 
 # =============================================================================
 
+# https://stackoverflow.com/a/21978778
+def log_subprocess_output(pipe):
+    for line in iter(pipe.readline, b''): # b'\n'-separated lines
+        logging.info('SUBPROCESS: %r', line)
+    
 def execute(cmd, capture=True, errors_ok=True) -> Optional[str]:
     try:
         if capture:
             return subprocess.check_output(cmd).strip().decode("utf-8")
-        subprocess.call(cmd)
+        
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        with process.stdout:
+            log_subprocess_output(process.stdout)
+        exitcode = process.wait() # 0 means success
+        if (exitcode != 0):
+            raise Exception(exitcode)
     except Exception as e:
         if not errors_ok:
             raise e
