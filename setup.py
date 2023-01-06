@@ -4,8 +4,8 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="minideploywin-heyjoeway",
-    version="0.1.1",
+    name="miniwindeploy-heyjoeway",
+    version="1.0.0",
     author="Joseph Judge",
     author_email="joe@jojudge.com",
     description="Stupid simple task runner, intended for deploying/debloating/customizing Windows ",
