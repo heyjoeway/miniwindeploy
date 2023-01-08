@@ -67,12 +67,18 @@ def log_subprocess_output(pipe):
     for line in iter(pipe.readline, b''): # b'\n'-separated lines
         logging.info('SUBPROCESS: %r', line)
     
-def execute(cmd, capture=True, errors_ok=True) -> Optional[str]:
+def execute(cmd, capture=True, errors_ok=True, cwd=None) -> Optional[str]:
     try:
         if capture:
-            return subprocess.check_output(cmd).strip().decode("utf-8")
+            return subprocess.check_output(
+                cmd, cwd=cwd
+            ).strip().decode("utf-8")
         
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(
+            cmd, cwd=cwd
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
         with process.stdout:
             log_subprocess_output(process.stdout)
         exitcode = process.wait() # 0 means success
@@ -110,7 +116,8 @@ class TaskExtensionHandlers:
         return execute(
             ["msiexec", "/i", path, "/passive", "/qr", "/norestart"],
             capture=False,
-            errors_ok=True
+            errors_ok=True,
+            cwd=os.path.dirname(path)
         )
 
     @staticmethod
@@ -118,7 +125,8 @@ class TaskExtensionHandlers:
         return execute(
             ["reg", "import", path],
             capture=False,
-            errors_ok=True
+            errors_ok=True,
+            cwd=os.path.dirname(path)
         )
 
     @staticmethod
@@ -143,7 +151,17 @@ class TaskExtensionHandlers:
         return execute(
             [path],
             capture=False,
-            errors_ok=True
+            errors_ok=True,
+            cwd=os.path.dirname(path)
+        )
+
+    @staticmethod
+    def exe(path: str) -> bool:
+        return execute(
+            [path],
+            capture=False,
+            errors_ok=True,
+            cwd=os.path.dirname(path)
         )
 
     @staticmethod
