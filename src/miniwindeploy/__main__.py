@@ -75,7 +75,7 @@ def execute(cmd, capture=True, errors_ok=True, cwd=None) -> Optional[str]:
             ).strip().decode("utf-8")
         
         process = subprocess.Popen(
-            cmd, cwd=cwd
+            cmd, cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT
         )
