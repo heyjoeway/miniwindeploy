@@ -4,6 +4,7 @@ DIR_ROOT = "./"
 # =============================================================================
 
 import argparse
+from argparse import RawTextHelpFormatter
 import os
 import re
 import ctypes
@@ -173,15 +174,16 @@ def get_class_functions(cls: Type) -> list[str, Callable]:
 
 # =============================================================================
 
-epilogue = "The following filetypes are recognized:\n"
+epilogue = "The following filetypes are recognized:\n\n"
 
 for funcName, func in get_class_functions(TaskExtensionHandlers):
-    epilogue += f"{funcName}: {func.__doc__}\n"
+    epilogue += f"{funcName}: {func.__doc__}\n\n"
 
 parser = argparse.ArgumentParser(
     prog="miniwindeploy",
     description="Stupid simple task runner, intended for deploying/debloating/customizing Windows",
-    epilog=epilogue
+    epilog=epilogue,
+    formatter_class=RawTextHelpFormatter
 )
 parser.add_argument(
     "-e", "--execute",
