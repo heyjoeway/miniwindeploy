@@ -1,43 +1,14 @@
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "-e", "--execute",
-    help="Execute actions (default behavior is to do a dry run)",
-    action="store_true"
-)
-parser.add_argument(
-    "-l", "--log",
-    help="File to log to (will also output to stdout)",
-    type=str
-)
-parser.add_argument(
-    "-m", "--model",
-    help="Act as if device is different model",
-    type=str
-)
-parser.add_argument(
-    "-u", "--usermode",
-    help="Skip requesting elevation",
-    action="store_true"
-)
-parser.add_argument(
-    "-r", "--realonly",
-    help="Only execute on physical machines, exit if in VM",
-    action="store_true"
-)
-
-
-args = parser.parse_args()
 
 DIR_ROOT = "./"
 
 # =============================================================================
 
+import argparse
 import os
 import re
 import ctypes
 import sys
-from typing import Optional
+from typing import Callable, Optional, Type
 import logging
 import subprocess
 import functools
@@ -48,14 +19,14 @@ import win32event
 # =============================================================================
 
 # https://stackoverflow.com/a/41930586
-def IsAdmin() -> bool:
+def is_admin() -> bool:
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
     except:
         return False
 
-def ForceAdmin() -> bool:
-    if not IsAdmin():
+def request_admin() -> bool:
+    if not is_admin():
         ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
         return True
     return False
@@ -90,7 +61,7 @@ def execute(cmd, capture=True, errors_ok=True, cwd=None) -> Optional[str]:
     return None
 
 @functools.cache
-def getSystemModelReal() -> Optional[str]:
+def get_system_model_real() -> Optional[str]:
     cmd = [
         'powershell.exe',
         "(Get-CimInstance -ClassName Win32_ComputerSystem).Model"
@@ -98,21 +69,24 @@ def getSystemModelReal() -> Optional[str]:
 
     return execute(cmd)
 
-def getSystemModel() -> Optional[str]:
+def get_system_model() -> Optional[str]:
     if args.model is not None:
         return args.model
 
-    return getSystemModelReal()
+    return get_system_model_real()
 
 @functools.cache
 def IsVirtualMachine() -> bool:
-    return getSystemModel() == "Virtual Machine"
+    return get_system_model() == "Virtual Machine"
 
 # =============================================================================
 
 class TaskExtensionHandlers:
     @staticmethod
     def msi(path: str) -> bool:
+        """
+        Executes MSI installer silently and waits until finished. Cancels restarts.
+        """
         return execute(
             ["msiexec", "/i", path, "/passive", "/qr", "/norestart"],
             capture=False,
@@ -122,6 +96,9 @@ class TaskExtensionHandlers:
 
     @staticmethod
     def reg(path: str) -> bool:
+        """
+        Applies registry patch.
+        """
         return execute(
             ["reg", "import", path],
             capture=False,
@@ -131,12 +108,19 @@ class TaskExtensionHandlers:
 
     @staticmethod
     def lnk(path: str) -> int:
+        """
+        Executes shortcut and waits for process to exit.
+        """
         se_ret = shell.ShellExecuteEx(fMask=0x140, lpFile=path, nShow=1)
         win32event.WaitForSingleObject(se_ret['hProcess'], -1)
         return se_ret
 
     @staticmethod
     def xml(path: str) -> Optional[bool]:
+        """
+        For XML files beginning with "Wi-Fi-", registers the wireless profiles.
+        Ignores other XML files.
+        """
         if not os.path.basename(path).startswith("Wi-Fi-"):
             return None
 
@@ -148,6 +132,9 @@ class TaskExtensionHandlers:
 
     @staticmethod
     def bat(path: str) -> bool:
+        """
+        Runs batch script and waits until exit.
+        """
         return execute(
             [path],
             capture=False,
@@ -157,6 +144,9 @@ class TaskExtensionHandlers:
 
     @staticmethod
     def exe(path: str) -> bool:
+        """
+        Runs executable and waits until exit.
+        """
         return execute(
             [path],
             capture=False,
@@ -166,11 +156,61 @@ class TaskExtensionHandlers:
 
     @staticmethod
     def ps1(path: str) -> bool:
+        """
+        Runs Powershell script and waits until exit.
+        """
         return execute(
             ["powershell", "-File", path],
             capture=False,
             errors_ok=True
         )
+
+def get_class_functions(cls: Type) -> list[str, Callable]:
+    for funcName in dir(cls):
+        func: Callable = getattr(cls, funcName)
+        if callable(func) and not funcName.startswith("__"):
+            yield (funcName, func)
+
+# =============================================================================
+
+epilogue = "The following filetypes are recognized:\n"
+
+for funcName, func in get_class_functions(TaskExtensionHandlers):
+    epilogue += f"{funcName}: {func.__doc__}"
+
+parser = argparse.ArgumentParser(
+    prog="miniwindeploy",
+    description="Stupid simple task runner, intended for deploying/debloating/customizing Windows",
+    epilog=epilogue
+)
+parser.add_argument(
+    "-e", "--execute",
+    help="Execute actions (default behavior is to do a dry run)",
+    action="store_true"
+)
+parser.add_argument(
+    "-l", "--log",
+    help="File to log to (will also output to stdout)",
+    type=str
+)
+parser.add_argument(
+    "-m", "--model",
+    help="Act as if device is different model",
+    type=str
+)
+parser.add_argument(
+    "-u", "--usermode",
+    help="Skip requesting elevation",
+    action="store_true"
+)
+parser.add_argument(
+    "-r", "--realonly",
+    help="Only execute on physical machines, exit if in VM",
+    action="store_true"
+)
+
+
+args = parser.parse_args()
 
 # =============================================================================
 
@@ -182,7 +222,7 @@ def natural_sort_key(s, _nsre=re.compile('([0-9]+)')):
         for text in _nsre.split(str(s))
     ]
 
-def ProcessTaskDir(path: str) -> None:
+def process_task_dir(path: str) -> None:
     logging.info(f"Processing task directory: {path}")
 
     # Only keep files
@@ -210,14 +250,14 @@ def ProcessTaskDir(path: str) -> None:
         except:
             pass
 
-def getSubdirs(path: str):
+def get_subdirs(path: str):
     return filter(
         lambda x: x.is_dir(),
         os.scandir(path)
     )
 
-def GetModelPath():
-    systemModel = getSystemModel()
+def get_model_path():
+    systemModel = get_system_model()
 
     systemModelsPath = os.path.join(DIR_ROOT, "Models")
 
@@ -225,7 +265,7 @@ def GetModelPath():
     try:
         systemModels = list(map(
             lambda x: x.name,
-            getSubdirs(systemModelsPath)
+            get_subdirs(systemModelsPath)
         ))
     except:
         logging.warning("Could not find model deployments")
@@ -237,22 +277,22 @@ def GetModelPath():
     logging.warning(f"No deployment information found for device: {systemModel}")
     return None
 
-def ExecuteOrderedTasks():
+def execute_ordered_tasks():
     pool = []
     
     try:
-        pool = list(getSubdirs(os.path.join(DIR_ROOT, "All")))
+        pool = list(get_subdirs(os.path.join(DIR_ROOT, "All")))
     except:
         logging.warning("Could not find global deployments")
 
-    modelPath = GetModelPath()
+    modelPath = get_model_path()
     if modelPath is not None:
-        pool += list(getSubdirs(modelPath))
+        pool += list(get_subdirs(modelPath))
 
     pool.sort(key=lambda x: natural_sort_key(x.name))
 
     for dirEntry in pool:
-        ProcessTaskDir(dirEntry.path)
+        process_task_dir(dirEntry.path)
 
 def main():
     if args.realonly and IsVirtualMachine():
@@ -263,7 +303,7 @@ def main():
             pass
         return
 
-    if not args.usermode and ForceAdmin():
+    if not args.usermode and request_admin():
         return
 
     logFormat = '%(asctime)s %(levelname)-8s %(message)s'
@@ -284,7 +324,7 @@ def main():
         ))
         logging.getLogger().addHandler(streamHandler)
 
-    ExecuteOrderedTasks()
+    execute_ordered_tasks()
 
 if __name__=="__main__":
     main()
