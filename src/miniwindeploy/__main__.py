@@ -177,7 +177,7 @@ def get_class_functions(cls: Type) -> list[str, Callable]:
 epilogue = "The following filetypes are recognized:\n"
 
 for funcName, func in get_class_functions(TaskExtensionHandlers):
-    epilogue += f"{funcName}: {func.__doc__}\n"
+    epilogue += f"{funcName}: {func.__doc__.strip()}\n"
 
 parser = argparse.ArgumentParser(
     prog="miniwindeploy",
