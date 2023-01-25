@@ -174,10 +174,10 @@ def get_class_functions(cls: Type) -> list[str, Callable]:
 
 # =============================================================================
 
-epilogue = "The following filetypes are recognized:\n\n"
+epilogue = "The following filetypes are recognized:\n"
 
 for funcName, func in get_class_functions(TaskExtensionHandlers):
-    epilogue += f"{funcName}: {func.__doc__}\n\n"
+    epilogue += f"{funcName}: {func.__doc__}\n"
 
 parser = argparse.ArgumentParser(
     prog="miniwindeploy",
@@ -210,7 +210,6 @@ parser.add_argument(
     help="Only execute on physical machines, exit if in VM",
     action="store_true"
 )
-
 
 args = parser.parse_args()
 
