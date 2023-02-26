@@ -37,7 +37,7 @@ def request_admin() -> bool:
 # https://stackoverflow.com/a/21978778
 def log_subprocess_output(pipe):
     for line in iter(pipe.readline, b''): # b'\n'-separated lines
-        logging.info('SUBPROCESS: %r', line)
+        logging.info('SUBPROCESS: %r', line.decode("utf-8"))
     
 def execute(cmd, capture=True, errors_ok=True, cwd=None) -> Optional[str]:
     try:
